@@ -1,0 +1,328 @@
+import datetime
+from time import timezone
+from typing import TypedDict
+
+from langgraph.graph import StateGraph, START, END
+
+from typing import TypedDict
+
+from finsight_mcp.schemas import (
+    PriceHistory,
+    NewsBundle,
+    CompanyFactsSummary,
+    TechnicalSignals,
+    ResearchBundle,
+    DraftResearchReport,
+    CriticResult,
+    StockResearchReport,
+)
+
+
+class StockResearchState(TypedDict, total=False):
+    # Input
+    ticker: str
+
+    # Data Collection
+    price_history: PriceHistory
+    news: NewsBundle
+    company_facts: CompanyFactsSummary
+
+    # Quantitative Analysis
+    technicals: TechnicalSignals
+
+    # Evidence Assembly
+    research_bundle: ResearchBundle
+
+    # Agents
+    draft_report: DraftResearchReport
+    critique: CriticResult
+    final_report: StockResearchReport
+
+from finsight_mcp.evidence import build_research_bundle
+
+#TODO: Add Data Collection Node, Quantitative Analysis Node
+
+
+async def data_collection_node(
+    state: StockResearchState
+) -> dict:
+
+    ticker = state["ticker"].upper()
+
+    price_history, news, company_facts = await asyncio.gather(
+        get_price_history(ticker),
+        get_recent_news(ticker),
+        get_company_facts(ticker),
+    )
+
+    return {
+        "ticker": ticker,
+        "price_history": price_history,
+        "news": news,
+        "company_facts": company_facts,
+    }
+
+
+def quantitative_analysis_node(
+    state: StockResearchState
+) -> dict:
+
+    price_history = state["price_history"]
+
+    technicals = calculate_technical_signals(
+        price_history
+    )
+
+    return {
+        "technicals": technicals,
+    }
+
+def evidence_assembly_node(
+    state: StockResearchState
+) -> dict:
+
+    evidence = build_evidence(
+        price_history=state["price_history"],
+        technicals=state["technicals"],
+        company_facts=state["company_facts"],
+        news=state["news"],
+    )
+
+    research_bundle = ResearchBundle(
+        ticker=state["ticker"],
+        technicals=state["technicals"],
+        company_facts=state["company_facts"],
+        news=state["news"],
+        evidence=evidence,
+    )
+
+    return {
+        "research_bundle": research_bundle,
+    }
+
+
+
+async def research_agent(
+    state: StockResearchState
+) -> dict:
+
+    bundle = state["research_bundle"]
+
+    draft = await llm.generate(
+        DraftResearchReport,
+        RESEARCH_INSTRUCTIONS,
+        {
+            "ticker": state["ticker"],
+            "evidence": bundle.model_dump(mode="json"),
+        },
+        "draft_research_report",
+    )
+
+    # deterministic field
+    draft.ticker = state["ticker"].upper()
+
+    return {
+        "draft_report": draft,
+    }
+
+
+async def critic_agent(
+    state: StockResearchState
+) -> dict:
+
+    critique = await llm.generate(
+        CriticResult,
+        CRITIC_INSTRUCTIONS,
+        {
+            "ticker": state["ticker"],
+            "evidence": state[
+                "research_bundle"
+            ].model_dump(mode="json"),
+            "draft": state[
+                "draft_report"
+            ].model_dump(mode="json"),
+        },
+        "critic_result",
+    )
+
+    return {
+        "critique": critique,
+    }
+
+
+DISCLAIMER = (
+    "For research and educational use only; "
+    "not personalized investment advice."
+)
+
+
+async def finalizer_agent(
+    state: StockResearchState
+) -> dict:
+
+    final = await llm.generate(
+        StockResearchReport,
+        FINALIZER_INSTRUCTIONS,
+        {
+            "ticker": state["ticker"],
+            "evidence": state[
+                "research_bundle"
+            ].model_dump(mode="json"),
+            "draft": state[
+                "draft_report"
+            ].model_dump(mode="json"),
+            "critique": state[
+                "critique"
+            ].model_dump(mode="json"),
+            "required_disclaimer": DISCLAIMER,
+        },
+        "stock_research_report",
+    )
+
+    # Enforce deterministic / system fields
+    final.ticker = state["ticker"].upper()
+
+    final.generated_at = datetime.now(
+        timezone.utc
+    ).isoformat()
+
+    final.disclaimer = DISCLAIMER
+
+    return {
+        "final_report": final,
+    }
+
+
+def build_workflow():
+
+    graph = StateGraph(StockResearchState)
+
+    graph.add_node(
+        "data_collection",
+        data_collection_node,
+    )
+
+    graph.add_node(
+        "quantitative_analysis",
+        quantitative_analysis_node,
+    )
+
+    graph.add_node(
+        "evidence_assembly",
+        evidence_assembly_node,
+    )
+
+    graph.add_node(
+        "research",
+        research_agent,
+    )
+
+    graph.add_node(
+        "critic",
+        critic_agent,
+    )
+
+    graph.add_node(
+        "finalize",
+        finalizer_agent,
+    )
+
+    graph.add_edge(
+        START,
+        "data_collection",
+    )
+
+    graph.add_edge(
+        "data_collection",
+        "quantitative_analysis",
+    )
+
+    graph.add_edge(
+        "quantitative_analysis",
+        "evidence_assembly",
+    )
+
+    graph.add_edge(
+        "evidence_assembly",
+        "research",
+    )
+
+    graph.add_edge(
+        "research",
+        "critic",
+    )
+
+    graph.add_edge(
+        "critic",
+        "finalize",
+    )
+
+    graph.add_edge(
+        "finalize",
+        END,
+    )
+
+    return graph.compile()
+
+
+
+
+# def critic_node(state: StockResearchState):
+
+#     draft_report = state["draft_report"]
+#     research_bundle = state["research_bundle"]
+
+#     critique = None  # TODO: Critic LLM
+
+#     return {
+#         "critique": critique
+#     }
+
+
+# def finalize_node(state: StockResearchState):
+
+#     draft_report = state["draft_report"]
+#     critique = state["critique"]
+
+#     final_report = None  # TODO: Finalizer LLM
+
+#     return {
+#         "final_report": final_report
+#     }
+
+#TODO: Based on the example below, try to implement all three agents (research, critic, finalizer) in the workflow.py file.
+# def finalizer_agent(state: AgentState) -> dict:
+#         score = ScoringBreakdown.model_validate(state["scores"])
+#         source_catalog = state["evidence"]["source_catalog"]
+#         citations = [
+#             Citation(source_id=s["source_id"], label=s["label"], url=s["url"])
+#             for s in source_catalog
+#         ]
+#         final = await llm.generate(
+#             EquityReport,
+#             FINALIZER_INSTRUCTIONS,
+#             {
+#                 "ticker": state["ticker"].upper(),
+#                 "as_of": datetime.now(timezone.utc).isoformat(),
+#                 "classification_rule": _classification(score.overall),
+#                 "deterministic_scores": score.model_dump(mode="json"),
+#                 "evidence": state["evidence"],
+#                 "draft": state["draft"],
+#                 "critique": state["critique"],
+#                 "required_citations": [c.model_dump(mode="json") for c in citations],
+#                 "required_disclaimer": (
+#                     "For research and educational use only; not personalized investment advice."
+#                 ),
+#             },
+#             "equity_research_report",
+#         )
+
+#         # Enforce deterministic fields after generation.
+#         final.ticker = state["ticker"].upper()
+#         final.as_of = datetime.now(timezone.utc)
+#         final.classification = _classification(score.overall)  # type: ignore[assignment]
+#         final.score = score.overall
+#         final.component_scores = score
+#         final.citations = citations
+#         final.disclaimer = "For research and educational use only; not personalized investment advice."
+#         return {"report": final.model_dump(mode="json")}

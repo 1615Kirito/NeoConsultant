@@ -1,0 +1,1 @@
+# Three kinds of prompts: research, critic, finalizer
