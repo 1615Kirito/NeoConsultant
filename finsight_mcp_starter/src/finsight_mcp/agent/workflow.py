@@ -16,6 +16,7 @@ from finsight_mcp.schemas import (
     CriticResult,
     StockResearchReport,
 )
+from finsight_mcp_starter.src.finsight_mcp.agent.prompts import *
 
 
 class StockResearchState(TypedDict, total=False):
@@ -32,6 +33,10 @@ class StockResearchState(TypedDict, total=False):
 
     # Evidence Assembly
     research_bundle: ResearchBundle
+
+    # Revision Agent
+    revision_count : int
+    max_revisions : int
 
     # Agents
     draft_report: DraftResearchReport
@@ -149,6 +154,40 @@ async def critic_agent(
         "critique": critique,
     }
 
+# Based on the critique + evidence + draft, revision
+async def revision_agent(
+    state: StockResearchState
+) -> dict:
+
+    revised_draft = await llm.generate(
+        DraftResearchReport,
+        REVISION_INSTRUCTIONS,
+        {
+            "ticker": state["ticker"],
+            "evidence": state[
+                "research_bundle"
+            ].model_dump(mode="json"),
+
+            "draft": state[
+                "draft_report"
+            ].model_dump(mode="json"),
+
+            "critique": state[
+                "critique"
+            ].model_dump(mode="json"),
+        },
+        "revised_research_report",
+    )
+
+    revised_draft.ticker = state["ticker"].upper()
+
+    return {
+        "draft_report": revised_draft,
+        "revision_count": state.get(
+            "revision_count", 0
+        ) + 1,
+    }
+
 
 DISCLAIMER = (
     "For research and educational use only; "
@@ -191,6 +230,35 @@ async def finalizer_agent(
     return {
         "final_report": final,
     }
+
+
+def route_after_critic(
+    state: StockResearchState
+) -> str:
+
+    critique = state["critique"]
+
+    revision_count = state.get(
+        "revision_count", 0
+    )
+
+    max_revisions = state.get(
+        "max_revisions", 2
+    )
+
+    # If we have reached the maximum number of revisions, we finalize the report
+    if revision_count >= max_revisions:
+        return "finalize"
+
+    # If the score is below 80, we route to revision
+    if critique.quality_score < 80:
+        return "revision"
+
+    # TODO: If we haave score, do we still need to check risk?
+    # if critique.risk == "high":
+    #     return "revision"
+
+    return "finalize"
 
 
 def build_workflow():
@@ -252,6 +320,17 @@ def build_workflow():
         "critic",
     )
 
+    #critic may go back to research if risk or score is too low
+    # add a revision agent
+
+    graph.add_conditional_edges(
+    "critic",
+    route_after_critic,
+    {
+        "revision": "revision",
+        "finalize": "finalize",
+    }
+)
     graph.add_edge(
         "critic",
         "finalize",

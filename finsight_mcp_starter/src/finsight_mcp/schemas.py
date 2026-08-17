@@ -74,27 +74,11 @@ class TechnicalSignals(BaseModel):
 
 # Is this the same as source ID?
 class Evidence(BaseModel):
-    evidence_id: str
+    evidence_id: str #match source url, source id
     category: str
     description: str
 
-# -------------------------
-# TODO: Add Critic Class.conclusion, issues(content + source id+source url), risks(content + source id + source url)
 
-# Should the source id be the same as the evidence id?
-# -------------------------
-
-class CriticItem(BaseModel):
-    content: str
-    evidence_id: str | None = None
-    source_id: str | None = None
-    source_url: str | None = None
-
-
-class CriticResult(BaseModel):
-    conclusion: str
-    issues: list[CriticItem]
-    risks: list[CriticItem]
 
 
 # -------------------------
@@ -109,19 +93,19 @@ class ResearchBundle(BaseModel):
     evidence: list[Evidence]
 
 
-
-
 # -------------------------
 # Agent output
 # -------------------------
 
 class Citation(BaseModel):
-    evidence_id: str
+    evidence_id: str #citation id is inddependent
     claim: str
 
 
 class DraftResearchReport(BaseModel):
     ticker: str
+
+    #How good the stock is. 0-100
     overall_score: int = Field(ge=0, le=100)
 
     classification: Literal[
@@ -139,8 +123,38 @@ class DraftResearchReport(BaseModel):
     summary: str
     catalysts: list[str]
     risks: list[str]
-    citations: list[Citation]
+    citations: list[Citation]  #ciations id
     data_gaps: list[str]
+
+
+
+# -------------------------
+# TODO: Add Critic Class.conclusion, issues(content + source id+source url), risks(content + source id + source url)
+
+# Should the source id be the same as the evidence id?
+# -------------------------
+
+# source id used all the time
+class CriticItem(BaseModel):
+    content: str
+    source_id: str | None = None
+    source_url: str | None = None
+
+
+class CriticResult(BaseModel):
+    conclusion: str
+
+    #How good the report is written, not how good the stock is. 0-100
+    quality_score: int = Field(ge=0, le=100)
+
+    #report specific issue
+    issues: list[CriticItem]
+
+    #specific risks content
+    risks: list[CriticItem]
+
+    #Final risk level
+    risk_level: Literal["low", "medium", "high"]
 
 
 class StockResearchReport(DraftResearchReport):
