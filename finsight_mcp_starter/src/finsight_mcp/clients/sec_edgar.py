@@ -1,6 +1,4 @@
 # SEC EDGAR Data Fetching Client
-
-
 import httpx
 
 from finsight_mcp_starter.src.finsight_mcp.schemas import CompanyFactsSummary
@@ -9,7 +7,7 @@ from finsight_mcp_starter.src.finsight_mcp.schemas import CompanyFactsSummary
 class SECEdgarError(RuntimeError):
     pass
 
-
+# TODO: Implement Settings in Config.py. Including api keys and something else.
 class SECEdgarClient:
     BASE_URL = "https://data.sec.gov"
 
@@ -26,66 +24,123 @@ class SECEdgarClient:
             "Accept-Encoding": "gzip, deflate",
         }
 
+    async def get_cik(
+        self,
+        ticker: str,
+    ) -> str:
+
+        url = (
+            "https://www.sec.gov/files/"
+            "company_tickers.json"
+        )
+
+        async with httpx.AsyncClient(
+            timeout=30.0,
+            headers=self.headers,
+        ) as client:
+
+            response = await client.get(url)
+
+            response.raise_for_status()
+
+        data = response.json()
+
+        ticker = ticker.upper()
+
+        for company in data.values():
+
+            if company["ticker"].upper() == ticker:
+
+                cik = str(
+                    company["cik_str"]
+                ).zfill(10)
+
+                return cik
+
+        raise SECEdgarError(
+            f"Could not find CIK for {ticker}"
+        )
 
 
-async def get_cik(
-    self,
-    ticker: str,
-) -> str:
+    async def get_company_facts_raw(
+        self,
+        cik: str,
+    ) -> dict:
 
-    url = (
-        "https://www.sec.gov/files/"
-        "company_tickers.json"
-    )
+        url = (
+            f"{self.BASE_URL}/api/xbrl/"
+            f"companyfacts/CIK{cik}.json"
+        )
 
-    async with httpx.AsyncClient(
-        timeout=30.0,
-        headers=self.headers,
-    ) as client:
+        async with httpx.AsyncClient(
+            timeout=30.0,
+            headers=self.headers,
+        ) as client:
 
-        response = await client.get(url)
+            response = await client.get(url)
 
-        response.raise_for_status()
+            response.raise_for_status()
 
-    data = response.json()
+        return response.json()
 
-    ticker = ticker.upper()
+    async def get_company_facts(
+        self,
+        ticker: str,
+    ) -> CompanyFactsSummary:
 
-    for company in data.values():
+        ticker = ticker.upper()
 
-        if company["ticker"].upper() == ticker:
+        cik = await self.get_cik(
+            ticker
+        )
 
-            cik = str(
-                company["cik_str"]
-            ).zfill(10)
+        data = await self.get_company_facts_raw(
+            cik
+        )
 
-            return cik
+        revenue = _latest_usd_value(
+            data,
+            [
+                "RevenueFromContractWithCustomerExcludingAssessedTax",
+                "Revenues",
+            ],
+        )
 
-    raise SECEdgarError(
-        f"Could not find CIK for {ticker}"
-    )
+        net_income = _latest_usd_value(
+            data,
+            [
+                "NetIncomeLoss",
+            ],
+        )
 
+        assets = _latest_usd_value(
+            data,
+            [
+                "Assets",
+            ],
+        )
 
-async def get_company_facts_raw(
-    self,
-    cik: str,
-) -> dict:
+        liabilities = _latest_usd_value(
+            data,
+            [
+                "Liabilities",
+            ],
+        )
 
-    url = (
-        f"{self.BASE_URL}/api/xbrl/"
-        f"companyfacts/CIK{cik}.json"
-    )
+        source_url = (
+            f"{self.BASE_URL}/api/xbrl/"
+            f"companyfacts/CIK{cik}.json"
+        )
 
-    async with httpx.AsyncClient(
-        timeout=30.0,
-        headers=self.headers,
-    ) as client:
-
-        response = await client.get(url)
-
-        response.raise_for_status()
-
-    return response.json()
+        return CompanyFactsSummary(
+            ticker=ticker,
+            revenue=revenue,
+            net_income=net_income,
+            assets=assets,
+            liabilities=liabilities,
+            source_id=f"sec_edgar:{cik}:companyfacts",
+            source_url=source_url,
+        )
 
 
 def _latest_usd_value(
@@ -142,63 +197,3 @@ def _latest_usd_value(
         )
 
     return None
-
-
-async def get_company_facts(
-    self,
-    ticker: str,
-) -> CompanyFactsSummary:
-
-    ticker = ticker.upper()
-
-    cik = await self.get_cik(
-        ticker
-    )
-
-    data = await self.get_company_facts_raw(
-        cik
-    )
-
-    revenue = _latest_usd_value(
-        data,
-        [
-            "RevenueFromContractWithCustomerExcludingAssessedTax",
-            "Revenues",
-        ],
-    )
-
-    net_income = _latest_usd_value(
-        data,
-        [
-            "NetIncomeLoss",
-        ],
-    )
-
-    assets = _latest_usd_value(
-        data,
-        [
-            "Assets",
-        ],
-    )
-
-    liabilities = _latest_usd_value(
-        data,
-        [
-            "Liabilities",
-        ],
-    )
-
-    source_url = (
-        f"{self.BASE_URL}/api/xbrl/"
-        f"companyfacts/CIK{cik}.json"
-    )
-
-    return CompanyFactsSummary(
-        ticker=ticker,
-        revenue=revenue,
-        net_income=net_income,
-        assets=assets,
-        liabilities=liabilities,
-        source_id=f"sec_edgar:{cik}:companyfacts",
-        source_url=source_url,
-    )

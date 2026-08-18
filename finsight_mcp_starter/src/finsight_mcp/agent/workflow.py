@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 from time import timezone
 from typing import TypedDict
@@ -130,7 +131,7 @@ async def research_agent(
         "draft_report": draft,
     }
 
-
+#Add evidence validation in the critic agent: go through evidence's source id, check if it's aligned with the data source id. if not passed, revision.
 async def critic_agent(
     state: StockResearchState
 ) -> dict:
@@ -254,9 +255,8 @@ def route_after_critic(
     if critique.quality_score < 80:
         return "revision"
 
-    # TODO: If we haave score, do we still need to check risk?
-    # if critique.risk == "high":
-    #     return "revision"
+    if critique.severity_level == "high":
+        return "revision"
 
     return "finalize"
 
@@ -265,6 +265,7 @@ def build_workflow():
 
     graph = StateGraph(StockResearchState)
 
+    # Define the nodes in the workflow
     graph.add_node(
         "data_collection",
         data_collection_node,
@@ -291,10 +292,16 @@ def build_workflow():
     )
 
     graph.add_node(
+        "revision",
+        revision_agent,
+    )
+
+    graph.add_node(
         "finalize",
         finalizer_agent,
     )
 
+    # Define the edges between nodes 
     graph.add_edge(
         START,
         "data_collection",
@@ -330,10 +337,11 @@ def build_workflow():
         "revision": "revision",
         "finalize": "finalize",
     }
-)
+    )
+
     graph.add_edge(
+        "revision",
         "critic",
-        "finalize",
     )
 
     graph.add_edge(

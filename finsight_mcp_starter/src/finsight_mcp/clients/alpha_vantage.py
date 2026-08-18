@@ -8,6 +8,9 @@ from finsight_mcp_starter.src.finsight_mcp.schemas import NewsBundle, NewsItem, 
 class AlphaVantageError(RuntimeError):
     pass
 
+
+#Alpha Vantage Client
+
 async def get_price_history(
     self,
     ticker: str,

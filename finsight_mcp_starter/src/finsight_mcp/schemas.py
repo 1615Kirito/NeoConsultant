@@ -75,11 +75,10 @@ class TechnicalSignals(BaseModel):
 # Is this the same as source ID?
 class Evidence(BaseModel):
     evidence_id: str #match source url, source id
+    source_id: str
+    source_url: str
     category: str
     description: str
-
-
-
 
 # -------------------------
 # Research bundle
@@ -98,7 +97,7 @@ class ResearchBundle(BaseModel):
 # -------------------------
 
 class Citation(BaseModel):
-    evidence_id: str #citation id is inddependent
+    evidence_id: str #citation id is independent
     claim: str
 
 
@@ -129,17 +128,13 @@ class DraftResearchReport(BaseModel):
 
 
 # -------------------------
-# TODO: Add Critic Class.conclusion, issues(content + source id+source url), risks(content + source id + source url)
-
 # Should the source id be the same as the evidence id?
 # -------------------------
 
 # source id used all the time
 class CriticItem(BaseModel):
     content: str
-    source_id: str | None = None
-    source_url: str | None = None
-
+    evidence_id: str
 
 class CriticResult(BaseModel):
     conclusion: str
@@ -150,11 +145,9 @@ class CriticResult(BaseModel):
     #report specific issue
     issues: list[CriticItem]
 
-    #specific risks content
-    risks: list[CriticItem]
+    #severity of the issues. 0-100
+    severity_level: Literal["low", "medium", "high"]
 
-    #Final risk level
-    risk_level: Literal["low", "medium", "high"]
 
 
 class StockResearchReport(DraftResearchReport):
