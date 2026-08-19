@@ -19,6 +19,20 @@ from finsight_mcp.schemas import (
 )
 from finsight_mcp_starter.src.finsight_mcp.agent.prompts import *
 
+from finsight_mcp_starter.src.finsight_mcp.clients.alpha_vantage import (
+    AlphaVantageClient,
+)
+
+from finsight_mcp_starter.src.finsight_mcp.clients.sec_edgar import (
+    SECEdgarClient,
+)
+
+from finsight_mcp_starter.src.finsight_mcp.config import settings
+
+
+alpha_client = AlphaVantageClient(settings)
+sec_client = SECEdgarClient(settings)
+
 
 class StockResearchState(TypedDict, total=False):
     # Input
@@ -56,9 +70,9 @@ async def data_collection_node(
     ticker = state["ticker"].upper()
 
     price_history, news, company_facts = await asyncio.gather(
-        get_price_history(ticker),
-        get_recent_news(ticker),
-        get_company_facts(ticker),
+        alpha_client.get_price_history(ticker),
+        alpha_client.get_recent_news(ticker),
+        sec_client.get_company_facts(ticker),
     )
 
     return {
