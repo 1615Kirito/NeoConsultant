@@ -19,6 +19,7 @@ from finsight_mcp.schemas import (
 )
 from finsight_mcp_starter.src.finsight_mcp.agent.prompts import *
 
+from finsight_mcp_starter.src.finsight_mcp.analytics.signals import calculate_technical_signals
 from finsight_mcp_starter.src.finsight_mcp.clients.alpha_vantage import (
     AlphaVantageClient,
 )
@@ -58,7 +59,7 @@ class StockResearchState(TypedDict, total=False):
     critique: CriticResult
     final_report: StockResearchReport
 
-from finsight_mcp.evidence import build_research_bundle
+from finsight_mcp.evidence import build_evidence, build_research_bundle
 
 #TODO: Add Data Collection Node, Quantitative Analysis Node
 
