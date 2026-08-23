@@ -1,7 +1,8 @@
 # SEC EDGAR Data Fetching Client
 import httpx
 
-from finsight_mcp_starter.src.finsight_mcp.schemas import CompanyFactsSummary
+from finsight_mcp.config import Settings
+from finsight_mcp.schemas import CompanyFactsSummary
 
 
 class SECEdgarError(RuntimeError):

@@ -2,7 +2,7 @@
 
 import math
 
-from finsight_mcp_starter.src.finsight_mcp.schemas import (
+from finsight_mcp.schemas import (
     PriceHistory,
     TechnicalSignals,
 )

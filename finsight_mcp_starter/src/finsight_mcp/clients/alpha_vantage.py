@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 import httpx
 
-from finsight_mcp_starter.src.finsight_mcp.schemas import (
+from finsight_mcp.schemas import (
     NewsBundle,
     NewsItem,
     PriceHistory,
@@ -12,7 +12,7 @@ from finsight_mcp_starter.src.finsight_mcp.schemas import (
 )
 
 # Settings
-from finsight_mcp_starter.src.finsight_mcp.config import Settings
+from finsight_mcp.config import Settings
 
 
 class AlphaVantageError(RuntimeError):

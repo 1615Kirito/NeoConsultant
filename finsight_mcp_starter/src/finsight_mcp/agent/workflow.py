@@ -17,18 +17,18 @@ from finsight_mcp.schemas import (
     CriticResult,
     StockResearchReport,
 )
-from finsight_mcp_starter.src.finsight_mcp.agent.prompts import *
+from finsight_mcp.agent.prompts import *
 
-from finsight_mcp_starter.src.finsight_mcp.analytics.signals import calculate_technical_signals
-from finsight_mcp_starter.src.finsight_mcp.clients.alpha_vantage import (
+from finsight_mcp.analytics.signals import calculate_technical_signals
+from finsight_mcp.clients.alpha_vantage import (
     AlphaVantageClient,
 )
 
-from finsight_mcp_starter.src.finsight_mcp.clients.sec_edgar import (
+from finsight_mcp.clients.sec_edgar import (
     SECEdgarClient,
 )
 
-from finsight_mcp_starter.src.finsight_mcp.config import settings
+from finsight_mcp.config import settings
 
 
 alpha_client = AlphaVantageClient(settings)
@@ -59,7 +59,7 @@ class StockResearchState(TypedDict, total=False):
     critique: CriticResult
     final_report: StockResearchReport
 
-from finsight_mcp.evidence import build_evidence, build_research_bundle
+from finsight_mcp.evidence import build_evidence #not sure if need to add build_research_bundle
 
 #TODO: Add Data Collection Node, Quantitative Analysis Node
 
