@@ -36,6 +36,8 @@ def build_evidence(
         evidence.append(
             Evidence(
                 evidence_id="price_latest",
+                source_id=price_history.source_id,
+                source_url=price_history.source_url,
                 category="price",
                 description=(
                     f"{price_history.ticker} "
@@ -54,6 +56,8 @@ def build_evidence(
 
         evidence.append(
             Evidence(
+                source_id=price_history.source_id,
+                source_url=price_history.source_url,
                 evidence_id="technical_return_30d",
                 category="technical",
                 description=(
@@ -68,6 +72,8 @@ def build_evidence(
 
         evidence.append(
             Evidence(
+                source_id=price_history.source_id,
+                source_url=price_history.source_url,
                 evidence_id="technical_sma_20",
                 category="technical",
                 description=(
@@ -82,6 +88,8 @@ def build_evidence(
 
         evidence.append(
             Evidence(
+                source_id=price_history.source_id,
+                source_url=price_history.source_url,
                 evidence_id="technical_volatility",
                 category="technical",
                 description=(
@@ -96,6 +104,8 @@ def build_evidence(
 
         evidence.append(
             Evidence(
+                source_id=price_history.source_id,
+                source_url=price_history.source_url,
                 evidence_id="technical_max_drawdown",
                 category="technical",
                 description=(
@@ -114,6 +124,8 @@ def build_evidence(
 
         evidence.append(
             Evidence(
+                source_id=company_facts.source_id,
+                source_url=company_facts.source_url,
                 evidence_id="fundamental_revenue",
                 category="fundamental",
                 description=(
@@ -127,6 +139,8 @@ def build_evidence(
 
         evidence.append(
             Evidence(
+                source_id=company_facts.source_id,
+                source_url=company_facts.source_url,
                 evidence_id="fundamental_net_income",
                 category="fundamental",
                 description=(
@@ -140,6 +154,8 @@ def build_evidence(
 
         evidence.append(
             Evidence(
+                source_id=company_facts.source_id,
+                source_url=company_facts.source_url,
                 evidence_id="fundamental_assets",
                 category="fundamental",
                 description=(
@@ -153,6 +169,8 @@ def build_evidence(
 
         evidence.append(
             Evidence(
+                source_id=company_facts.source_id,
+                source_url=company_facts.source_url,
                 evidence_id="fundamental_liabilities",
                 category="fundamental",
                 description=(
