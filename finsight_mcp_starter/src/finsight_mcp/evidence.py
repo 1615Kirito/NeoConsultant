@@ -1,6 +1,3 @@
-#Facts 
-
-
 from finsight_mcp.schemas import (
     CompanyFactsSummary,
     Evidence,
@@ -17,32 +14,34 @@ def build_evidence(
     news: NewsBundle,
 ) -> list[Evidence]:
     """
-    Convert collected data into evidence items
-    that can later be cited by the research agent.
+    Convert collected and calculated data into concise evidence items.
+
+    Design rules:
+    - evidence_id identifies the Evidence item itself.
+    - source_id identifies the underlying data source.
+    - evidence_id and source_id are independent.
+    - Related facts from the same source are grouped when they support
+      the same analytical point.
     """
 
     evidence: list[Evidence] = []
+    ticker = price_history.ticker.upper()
 
     # ==================================================
     # Price evidence
     # ==================================================
 
     if price_history.prices:
-
-        latest_price = (
-            price_history.prices[-1]
-        )
+        latest_price = price_history.prices[-1]
 
         evidence.append(
             Evidence(
-                evidence_id="price_latest",
+                evidence_id=f"{ticker}_price_latest",
                 source_id=price_history.source_id,
                 source_url=price_history.source_url,
                 category="price",
                 description=(
-                    f"{price_history.ticker} "
-                    f"closed at "
-                    f"${latest_price.close:.2f} "
+                    f"{ticker} closed at ${latest_price.close:.2f} "
                     f"on {latest_price.date}."
                 ),
             )
@@ -52,66 +51,60 @@ def build_evidence(
     # Technical evidence
     # ==================================================
 
-    if technicals.return_30d is not None:
+    momentum_parts: list[str] = []
 
-        evidence.append(
-            Evidence(
-                source_id=price_history.source_id,
-                source_url=price_history.source_url,
-                evidence_id="technical_return_30d",
-                category="technical",
-                description=(
-                    f"The stock's approximately "
-                    f"30-day return was "
-                    f"{technicals.return_30d:.2%}."
-                ),
-            )
+    if technicals.return_30d is not None:
+        momentum_parts.append(
+            f"approximately 30-day return was "
+            f"{technicals.return_30d:.2%}"
         )
 
     if technicals.sma_20 is not None:
+        momentum_parts.append(
+            f"the 20-day simple moving average was "
+            f"${technicals.sma_20:.2f}"
+        )
 
+    if momentum_parts:
         evidence.append(
             Evidence(
+                evidence_id=f"{ticker}_technical_momentum",
                 source_id=price_history.source_id,
                 source_url=price_history.source_url,
-                evidence_id="technical_sma_20",
                 category="technical",
                 description=(
-                    f"The 20-day simple moving "
-                    f"average was "
-                    f"${technicals.sma_20:.2f}."
+                    f"For {ticker}, "
+                    + "; ".join(momentum_parts)
+                    + "."
                 ),
             )
         )
 
-    if technicals.volatility is not None:
+    risk_parts: list[str] = []
 
-        evidence.append(
-            Evidence(
-                source_id=price_history.source_id,
-                source_url=price_history.source_url,
-                evidence_id="technical_volatility",
-                category="technical",
-                description=(
-                    f"Annualized historical "
-                    f"volatility was approximately "
-                    f"{technicals.volatility:.2%}."
-                ),
-            )
+    if technicals.volatility is not None:
+        risk_parts.append(
+            f"annualized historical volatility was "
+            f"approximately {technicals.volatility:.2%}"
         )
 
     if technicals.max_drawdown is not None:
+        risk_parts.append(
+            f"maximum drawdown over the available price history "
+            f"was {technicals.max_drawdown:.2%}"
+        )
 
+    if risk_parts:
         evidence.append(
             Evidence(
+                evidence_id=f"{ticker}_technical_risk",
                 source_id=price_history.source_id,
                 source_url=price_history.source_url,
-                evidence_id="technical_max_drawdown",
                 category="technical",
                 description=(
-                    f"Maximum drawdown over the "
-                    f"available price history was "
-                    f"{technicals.max_drawdown:.2%}."
+                    f"For {ticker}, "
+                    + "; ".join(risk_parts)
+                    + "."
                 ),
             )
         )
@@ -120,63 +113,42 @@ def build_evidence(
     # Fundamental evidence
     # ==================================================
 
-    if company_facts.revenue is not None:
+    fundamental_parts: list[str] = []
 
-        evidence.append(
-            Evidence(
-                source_id=company_facts.source_id,
-                source_url=company_facts.source_url,
-                evidence_id="fundamental_revenue",
-                category="fundamental",
-                description=(
-                    f"Reported revenue was "
-                    f"${company_facts.revenue:,.0f}."
-                ),
-            )
+    if company_facts.revenue is not None:
+        fundamental_parts.append(
+            f"reported revenue was ${company_facts.revenue:,.0f}"
         )
 
     if company_facts.net_income is not None:
-
-        evidence.append(
-            Evidence(
-                source_id=company_facts.source_id,
-                source_url=company_facts.source_url,
-                evidence_id="fundamental_net_income",
-                category="fundamental",
-                description=(
-                    f"Reported net income was "
-                    f"${company_facts.net_income:,.0f}."
-                ),
-            )
+        fundamental_parts.append(
+            f"reported net income was "
+            f"${company_facts.net_income:,.0f}"
         )
 
     if company_facts.assets is not None:
-
-        evidence.append(
-            Evidence(
-                source_id=company_facts.source_id,
-                source_url=company_facts.source_url,
-                evidence_id="fundamental_assets",
-                category="fundamental",
-                description=(
-                    f"Reported total assets were "
-                    f"${company_facts.assets:,.0f}."
-                ),
-            )
+        fundamental_parts.append(
+            f"reported total assets were "
+            f"${company_facts.assets:,.0f}"
         )
 
     if company_facts.liabilities is not None:
+        fundamental_parts.append(
+            f"reported total liabilities were "
+            f"${company_facts.liabilities:,.0f}"
+        )
 
+    if fundamental_parts:
         evidence.append(
             Evidence(
+                evidence_id=f"{ticker}_fundamental_financials",
                 source_id=company_facts.source_id,
                 source_url=company_facts.source_url,
-                evidence_id="fundamental_liabilities",
                 category="fundamental",
                 description=(
-                    f"Reported total liabilities "
-                    f"were "
-                    f"${company_facts.liabilities:,.0f}."
+                    f"For {ticker}, "
+                    + "; ".join(fundamental_parts)
+                    + "."
                 ),
             )
         )
@@ -185,17 +157,15 @@ def build_evidence(
     # News evidence
     # ==================================================
 
-    for index, article in enumerate(
-        news.articles
-    ):
-
+    for index, article in enumerate(news.articles, start=1):
         evidence.append(
             Evidence(
-                evidence_id=f"news_{index + 1}",
+                evidence_id=f"{ticker}_news_{index}",
+                source_id=article.source_id,
+                source_url=article.source_url,
                 category="news",
                 description=(
-                    f"{article.title}. "
-                    f"{article.summary}"
+                    f"{article.title}. {article.summary}"
                 ),
             )
         )
