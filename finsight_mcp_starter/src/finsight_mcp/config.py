@@ -7,7 +7,7 @@ import os
 from dotenv import load_dotenv
 
 
-load_dotenv()
+load_dotenv("variables.env")
 
 class Settings:
     def __init__(self):

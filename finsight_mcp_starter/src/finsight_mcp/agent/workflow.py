@@ -70,11 +70,14 @@ async def data_collection_node(
 
     ticker = state["ticker"].upper()
 
-    price_history, news, company_facts = await asyncio.gather(
+    price_history, company_facts = await asyncio.gather(
         alpha_client.get_price_history(ticker),
-        alpha_client.get_recent_news(ticker),
         sec_client.get_company_facts(ticker),
     )
+
+    await asyncio.sleep(1.1)
+
+    news = await alpha_client.get_recent_news(ticker)
 
     return {
         "ticker": ticker,
