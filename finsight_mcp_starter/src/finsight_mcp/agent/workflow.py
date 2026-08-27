@@ -8,6 +8,7 @@ from langgraph.graph import StateGraph, START, END
 from typing import TypedDict
 
 from finsight_mcp.schemas import (
+    CriticItem,
     PriceHistory,
     NewsBundle,
     CompanyFactsSummary,
@@ -61,8 +62,6 @@ class StockResearchState(TypedDict, total=False):
 
 from finsight_mcp.evidence import build_evidence #not sure if need to add build_research_bundle
 
-#TODO: Add Data Collection Node, Quantitative Analysis Node
-
 
 async def data_collection_node(
     state: StockResearchState
@@ -78,7 +77,6 @@ async def data_collection_node(
     await asyncio.sleep(1.1)
 
     news = await alpha_client.get_recent_news(ticker)
-
     return {
         "ticker": ticker,
         "price_history": price_history,
@@ -101,10 +99,12 @@ def quantitative_analysis_node(
         "technicals": technicals,
     }
 
+#Evidnec
 def evidence_assembly_node(
     state: StockResearchState
 ) -> dict:
 
+    
     evidence = build_evidence(
         price_history=state["price_history"],
         technicals=state["technicals"],
@@ -114,16 +114,12 @@ def evidence_assembly_node(
 
     research_bundle = ResearchBundle(
         ticker=state["ticker"],
-        technicals=state["technicals"],
-        company_facts=state["company_facts"],
-        news=state["news"],
         evidence=evidence,
     )
 
     return {
         "research_bundle": research_bundle,
     }
-
 
 
 async def research_agent(
@@ -149,7 +145,7 @@ async def research_agent(
         "draft_report": draft,
     }
 
-#Add evidence validation in the critic agent: go through evidence's source id, check if it's aligned with the data source id. if not passed, revision.
+#TODO: Add manual evidence validation in the critic agent: go through evidence's source id, check if it's aligned with the data source id. if not passed, revision.
 async def critic_agent(
     state: StockResearchState
 ) -> dict:
@@ -169,10 +165,19 @@ async def critic_agent(
         "critic_result",
     )
 
+    validation_issues = validate_evidence(state)
+
+    if validation_issues:
+        critique.issues.extend(validation_issues)
+        critique.severity_level = "high"
+        critique.quality_score = min(
+            critique.quality_score,
+            50,
+        )
+
     return {
         "critique": critique,
     }
-
 # Based on the critique + evidence + draft, revision
 async def revision_agent(
     state: StockResearchState
@@ -250,7 +255,7 @@ async def finalizer_agent(
         "final_report": final,
     }
 
-
+#Helper Functions
 def route_after_critic(
     state: StockResearchState
 ) -> str:
@@ -277,6 +282,57 @@ def route_after_critic(
         return "revision"
 
     return "finalize"
+
+
+def validate_evidence(
+    state: StockResearchState,
+) -> list[CriticItem]:
+
+    issues = []
+
+    # 1. 收集所有合法的 source_id
+    valid_source_ids = {
+        state["price_history"].source_id,
+        state["company_facts"].source_id,
+    }
+
+    for article in state["news"].articles:
+        valid_source_ids.add(article.source_id)
+
+    # 2. 检查每条 evidence 的 source_id 是否真的存在
+    valid_evidence_ids = set()
+
+    for evidence in state["research_bundle"].evidence:
+
+        valid_evidence_ids.add(evidence.evidence_id)
+
+        if evidence.source_id not in valid_source_ids:
+            issues.append(
+                CriticItem(
+                    content=(
+                        f"Evidence {evidence.evidence_id} "
+                        f"references unknown source_id: "
+                        f"{evidence.source_id}"
+                    ),
+                    evidence_id=evidence.evidence_id,
+                )
+            )
+
+    # 3. 检查 draft citation 引用的 evidence_id 是否存在
+    for citation in state["draft_report"].citations:
+
+        if citation.evidence_id not in valid_evidence_ids:
+            issues.append(
+                CriticItem(
+                    content=(
+                        f"Citation references unknown evidence_id: "
+                        f"{citation.evidence_id}"
+                    ),
+                    evidence_id=citation.evidence_id,
+                )
+            )
+
+    return issues
 
 
 def build_workflow():
@@ -369,65 +425,3 @@ def build_workflow():
 
     return graph.compile()
 
-
-
-
-# def critic_node(state: StockResearchState):
-
-#     draft_report = state["draft_report"]
-#     research_bundle = state["research_bundle"]
-
-#     critique = None  # TODO: Critic LLM
-
-#     return {
-#         "critique": critique
-#     }
-
-
-# def finalize_node(state: StockResearchState):
-
-#     draft_report = state["draft_report"]
-#     critique = state["critique"]
-
-#     final_report = None  # TODO: Finalizer LLM
-
-#     return {
-#         "final_report": final_report
-#     }
-
-#TODO: Based on the example below, try to implement all three agents (research, critic, finalizer) in the workflow.py file.
-# def finalizer_agent(state: AgentState) -> dict:
-#         score = ScoringBreakdown.model_validate(state["scores"])
-#         source_catalog = state["evidence"]["source_catalog"]
-#         citations = [
-#             Citation(source_id=s["source_id"], label=s["label"], url=s["url"])
-#             for s in source_catalog
-#         ]
-#         final = await llm.generate(
-#             EquityReport,
-#             FINALIZER_INSTRUCTIONS,
-#             {
-#                 "ticker": state["ticker"].upper(),
-#                 "as_of": datetime.now(timezone.utc).isoformat(),
-#                 "classification_rule": _classification(score.overall),
-#                 "deterministic_scores": score.model_dump(mode="json"),
-#                 "evidence": state["evidence"],
-#                 "draft": state["draft"],
-#                 "critique": state["critique"],
-#                 "required_citations": [c.model_dump(mode="json") for c in citations],
-#                 "required_disclaimer": (
-#                     "For research and educational use only; not personalized investment advice."
-#                 ),
-#             },
-#             "equity_research_report",
-#         )
-
-#         # Enforce deterministic fields after generation.
-#         final.ticker = state["ticker"].upper()
-#         final.as_of = datetime.now(timezone.utc)
-#         final.classification = _classification(score.overall)  # type: ignore[assignment]
-#         final.score = score.overall
-#         final.component_scores = score
-#         final.citations = citations
-#         final.disclaimer = "For research and educational use only; not personalized investment advice."
-#         return {"report": final.model_dump(mode="json")}

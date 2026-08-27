@@ -74,7 +74,7 @@ class TechnicalSignals(BaseModel):
 
 # Is this the same as source ID?
 class Evidence(BaseModel):
-    evidence_id: str #match source url, source id
+    evidence_id: str 
     source_id: str
     source_url: str
     category: str
@@ -86,9 +86,9 @@ class Evidence(BaseModel):
 
 class ResearchBundle(BaseModel):
     ticker: str
-    technicals: TechnicalSignals
-    company_facts: CompanyFactsSummary
-    news: NewsBundle
+    # technicals: TechnicalSignals
+    # company_facts: CompanyFactsSummary
+    # news: NewsBundle
     evidence: list[Evidence]
 
 
@@ -101,10 +101,20 @@ class Citation(BaseModel):
     claim: str
 
 
+class StockScoreBreakdown(BaseModel):
+    price_score: int = Field(ge=0, le=100)
+    technical_score: int = Field(ge=0, le=100)
+    fundamental_score: int = Field(ge=0, le=100)
+    news_score: int = Field(ge=0, le=100)
+    reasoning_score: int = Field(ge=0, le=100)
+
 class DraftResearchReport(BaseModel):
     ticker: str
 
+    #TODO: We could make this like 20% price+10% tech+ 10% fundamental+10% news+50% agent reasoning. 0-100. Find score for every part.
     #How good the stock is. 0-100
+
+    score_breakdown: StockScoreBreakdown
     overall_score: int = Field(ge=0, le=100)
 
     classification: Literal[
@@ -124,8 +134,6 @@ class DraftResearchReport(BaseModel):
     risks: list[str]
     citations: list[Citation]  #ciations id
     data_gaps: list[str]
-
-
 
 # -------------------------
 # Should the source id be the same as the evidence id?
