@@ -1,8 +1,10 @@
 import asyncio
 import datetime
+from functools import partial
 from time import timezone
 from typing import TypedDict
 
+from langgraph import graph
 from langgraph.graph import StateGraph, START, END
 
 from typing import TypedDict
@@ -30,6 +32,8 @@ from finsight_mcp.clients.sec_edgar import (
 )
 
 from finsight_mcp.config import settings
+from finsight_mcp.llm import llm
+from finsight_mcp.mcp_client import MCPToolClient
 
 
 alpha_client = AlphaVantageClient(settings)
@@ -64,19 +68,46 @@ from finsight_mcp.evidence import build_evidence #not sure if need to add build_
 
 
 async def data_collection_node(
-    state: StockResearchState
+    state: StockResearchState,
+    tools: MCPToolClient,
 ) -> dict:
 
     ticker = state["ticker"].upper()
 
-    price_history, company_facts = await asyncio.gather(
-        alpha_client.get_price_history(ticker),
-        sec_client.get_company_facts(ticker),
+    price_raw, company_facts_raw = await asyncio.gather(
+        tools.call(
+            "get_price_history",
+            {
+                "ticker": ticker,
+            },
+        ),
+        tools.call(
+            "get_company_facts",
+            {
+                "ticker": ticker,
+            },
+        ),
     )
 
-    await asyncio.sleep(1.1)
+    news_raw = await tools.call(
+        "get_recent_news",
+        {
+            "ticker": ticker,
+        },
+    )
 
-    news = await alpha_client.get_recent_news(ticker)
+    price_history = PriceHistory.model_validate(
+        price_raw
+    )
+
+    company_facts = CompanyFactsSummary.model_validate(
+        company_facts_raw
+    )
+
+    news = NewsBundle.model_validate(
+        news_raw
+    )
+
     return {
         "ticker": ticker,
         "price_history": price_history,
@@ -123,7 +154,8 @@ def evidence_assembly_node(
 
 
 async def research_agent(
-    state: StockResearchState
+    state: StockResearchState,
+    llm,
 ) -> dict:
 
     bundle = state["research_bundle"]
@@ -138,16 +170,18 @@ async def research_agent(
         "draft_research_report",
     )
 
-    # deterministic field
     draft.ticker = state["ticker"].upper()
 
     return {
         "draft_report": draft,
     }
 
+
+
 #TODO: Add manual evidence validation in the critic agent: go through evidence's source id, check if it's aligned with the data source id. if not passed, revision.
 async def critic_agent(
-    state: StockResearchState
+    state: StockResearchState,
+    llm,
 ) -> dict:
 
     critique = await llm.generate(
@@ -180,7 +214,8 @@ async def critic_agent(
     }
 # Based on the critique + evidence + draft, revision
 async def revision_agent(
-    state: StockResearchState
+    state: StockResearchState,
+    llm,
 ) -> dict:
 
     revised_draft = await llm.generate(
@@ -220,7 +255,8 @@ DISCLAIMER = (
 
 
 async def finalizer_agent(
-    state: StockResearchState
+    state: StockResearchState,
+    llm,
 ) -> dict:
 
     final = await llm.generate(
@@ -290,7 +326,7 @@ def validate_evidence(
 
     issues = []
 
-    # 1. 收集所有合法的 source_id
+    # Collect all ids
     valid_source_ids = {
         state["price_history"].source_id,
         state["company_facts"].source_id,
@@ -299,7 +335,7 @@ def validate_evidence(
     for article in state["news"].articles:
         valid_source_ids.add(article.source_id)
 
-    # 2. 检查每条 evidence 的 source_id 是否真的存在
+    # 2. check if every source id exists
     valid_evidence_ids = set()
 
     for evidence in state["research_bundle"].evidence:
@@ -318,7 +354,7 @@ def validate_evidence(
                 )
             )
 
-    # 3. 检查 draft citation 引用的 evidence_id 是否存在
+    # 3. Check evidence id
     for citation in state["draft_report"].citations:
 
         if citation.evidence_id not in valid_evidence_ids:
@@ -335,14 +371,20 @@ def validate_evidence(
     return issues
 
 
-def build_workflow():
+def build_workflow(
+    tools: MCPToolClient,
+    llm,
+):
 
     graph = StateGraph(StockResearchState)
 
     # Define the nodes in the workflow
     graph.add_node(
         "data_collection",
-        data_collection_node,
+        partial(
+            data_collection_node,
+            tools=tools,
+        ),
     )
 
     graph.add_node(
@@ -357,24 +399,36 @@ def build_workflow():
 
     graph.add_node(
         "research",
-        research_agent,
+        partial(
+            research_agent,
+            llm=llm,
+        ),
     )
 
     graph.add_node(
         "critic",
-        critic_agent,
+        partial(
+            critic_agent,
+            llm=llm,
+        ),
     )
 
     graph.add_node(
         "revision",
-        revision_agent,
+        partial(
+            revision_agent,
+            llm=llm,
+        ),
     )
 
     graph.add_node(
         "finalize",
-        finalizer_agent,
+        partial(
+            finalizer_agent,
+            llm=llm,
+        ),
     )
-
+    
     # Define the edges between nodes 
     graph.add_edge(
         START,

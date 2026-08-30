@@ -11,7 +11,7 @@ T = TypeVar(
 )
 
 
-class LLMClient:
+class llm:
 
     def __init__(
         self,
