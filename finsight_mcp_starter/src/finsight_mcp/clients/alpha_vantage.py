@@ -113,6 +113,7 @@ class AlphaVantageClient:
             key=lambda p: p.date
         )
 
+
         return PriceHistory(
             ticker=ticker,
             prices=prices,

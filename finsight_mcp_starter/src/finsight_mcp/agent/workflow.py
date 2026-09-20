@@ -1,7 +1,7 @@
 import asyncio
-import datetime
+
 from functools import partial
-from time import timezone
+from datetime import datetime, timezone
 from typing import TypedDict
 
 from langgraph import graph
@@ -49,6 +49,7 @@ class StockResearchState(TypedDict, total=False):
     news: NewsBundle
     company_facts: CompanyFactsSummary
 
+
     # Quantitative Analysis
     technicals: TechnicalSignals
 
@@ -79,6 +80,7 @@ async def data_collection_node(
             "get_price_history",
             {
                 "ticker": ticker,
+                "days": 100,
             },
         ),
         tools.call(
@@ -88,6 +90,8 @@ async def data_collection_node(
             },
         ),
     )
+
+    await asyncio.sleep(2)
 
     news_raw = await tools.call(
         "get_recent_news",
@@ -168,6 +172,7 @@ async def research_agent(
             "evidence": bundle.model_dump(mode="json"),
         },
         "draft_research_report",
+
     )
 
     draft.ticker = state["ticker"].upper()
@@ -197,6 +202,7 @@ async def critic_agent(
             ].model_dump(mode="json"),
         },
         "critic_result",
+
     )
 
     validation_issues = validate_evidence(state)
@@ -236,6 +242,7 @@ async def revision_agent(
             ].model_dump(mode="json"),
         },
         "revised_research_report",
+
     )
 
     revised_draft.ticker = state["ticker"].upper()
@@ -276,6 +283,7 @@ async def finalizer_agent(
             "required_disclaimer": DISCLAIMER,
         },
         "stock_research_report",
+
     )
 
     # Enforce deterministic / system fields

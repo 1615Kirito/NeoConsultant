@@ -17,8 +17,19 @@ class MCPToolClient:
     async def call(self, name: str, arguments: dict) -> dict:
         result = await self.session.call_tool(name, arguments)
 
-        if result.structuredContent is not None:
-            return result.structuredContent
+        if result.is_error:
+            error_text = " | ".join(
+                content.text
+                for content in result.content
+                if isinstance(content, types.TextContent)
+            )
+
+            raise RuntimeError(
+                f"MCP tool {name!r} failed: {error_text}"
+            )
+
+        if result.structured_content is not None:
+            return result.structured_content
 
         for content in result.content:
             if isinstance(content, types.TextContent):

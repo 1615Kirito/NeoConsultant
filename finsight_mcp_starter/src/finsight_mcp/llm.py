@@ -4,6 +4,8 @@ from typing import TypeVar
 from pydantic import BaseModel
 from langchain.chat_models import init_chat_model
 
+from finsight_mcp.config import settings
+
 
 T = TypeVar(
     "T",
@@ -15,12 +17,17 @@ class llm:
 
     def __init__(
         self,
-        model_name: str = "gpt-5.4-mini",
+        max_tokens: int = 4096,
     ):
         self.model = init_chat_model(
-            model_name,
+            settings.model_name,
+            model_provider="openai",
+            base_url="https://api.deepseek.com",
+            api_key=settings.deepseek_api_key,
             temperature=0,
+            max_tokens=max_tokens,
         )
+
 
     async def generate(
         self,
@@ -52,6 +59,8 @@ class llm:
         T
             Validated Pydantic model.
         """
+
+
 
         structured_model = (
             self.model.with_structured_output(

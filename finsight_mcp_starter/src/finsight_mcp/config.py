@@ -26,11 +26,11 @@ class Settings:
         # LLM / Model
         self.model_name = os.getenv(
             "MODEL_NAME",
-            "gpt-5.6"
+            "deepseek-flash"
         )
 
-        self.openai_api_key = os.getenv(
-            "OPENAI_API_KEY",
+        self.deepseek_api_key = os.getenv(
+            "DEEPSEEK_API_KEY",
             ""
         )
 
