@@ -24,8 +24,14 @@ class llm:
             model_provider="openai",
             base_url="https://api.deepseek.com",
             api_key=settings.deepseek_api_key,
-            temperature=0,
             max_tokens=max_tokens,
+            model_kwargs={
+                "extra_body": {
+                    "thinking": {
+                        "type": "disabled"
+                    }
+                }
+            },
         )
 
 
@@ -64,7 +70,8 @@ class llm:
 
         structured_model = (
             self.model.with_structured_output(
-                output_schema
+                output_schema,
+                method="function_calling",
             )
         )
 
