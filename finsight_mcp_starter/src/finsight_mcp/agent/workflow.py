@@ -19,6 +19,7 @@ from finsight_mcp.schemas import (
     DraftResearchReport,
     CriticResult,
     StockResearchReport,
+    StockScoreBreakdown,
 )
 from finsight_mcp.agent.prompts import *
 
@@ -43,6 +44,7 @@ sec_client = SECEdgarClient(settings)
 class StockResearchState(TypedDict, total=False):
     # Input
     ticker: str
+    days: int = 100
 
     # Data Collection
     price_history: PriceHistory
@@ -63,6 +65,7 @@ class StockResearchState(TypedDict, total=False):
     # Agents
     draft_report: DraftResearchReport
     critique: CriticResult
+    critique_history: list[CriticResult]
     final_report: StockResearchReport
 
 from finsight_mcp.evidence import build_evidence #not sure if need to add build_research_bundle
@@ -74,13 +77,14 @@ async def data_collection_node(
 ) -> dict:
 
     ticker = state["ticker"].upper()
+    days = state.get("days", 100)
 
     price_raw, company_facts_raw = await asyncio.gather(
         tools.call(
             "get_price_history",
             {
                 "ticker": ticker,
-                "days": 100,
+                "days": days,
             },
         ),
         tools.call(
@@ -177,6 +181,15 @@ async def research_agent(
 
     draft.ticker = state["ticker"].upper()
 
+    draft.overall_score = calculate_overall_score(
+        draft.score_breakdown
+    )
+
+    draft = attach_citation_urls(
+        draft,
+        bundle,
+    )
+
     return {
         "draft_report": draft,
     }
@@ -215,8 +228,20 @@ async def critic_agent(
             50,
         )
 
+
+
+    history = state.get("critique_history", [])
+
+    updated_history = history + [critique]
+
+    print_critic_feedback(
+        critique,
+        len(updated_history),
+    )
+
     return {
         "critique": critique,
+        "critique_history": updated_history,
     }
 # Based on the critique + evidence + draft, revision
 async def revision_agent(
@@ -246,6 +271,18 @@ async def revision_agent(
     )
 
     revised_draft.ticker = state["ticker"].upper()
+
+
+    revised_draft.overall_score = calculate_overall_score(
+        revised_draft.score_breakdown
+    )
+
+    revised_draft = attach_citation_urls(
+        revised_draft,
+        state["research_bundle"],
+    )
+
+    
 
     return {
         "draft_report": revised_draft,
@@ -295,11 +332,87 @@ async def finalizer_agent(
 
     final.disclaimer = DISCLAIMER
 
+    final.overall_score = calculate_overall_score(
+        final.score_breakdown
+    )
+
+    final = attach_citation_urls(
+        final,
+        state["research_bundle"],
+    )
+
     return {
         "final_report": final,
     }
 
 #Helper Functions
+PRICE_WEIGHT = 0.15
+TECHNICAL_WEIGHT = 0.20
+FUNDAMENTAL_WEIGHT = 0.30
+NEWS_WEIGHT = 0.15
+REASONING_WEIGHT = 0.20
+
+
+def calculate_overall_score(
+    breakdown: StockScoreBreakdown,
+) -> int:
+
+    score = (
+        breakdown.price_score * PRICE_WEIGHT
+        + breakdown.technical_score * TECHNICAL_WEIGHT
+        + breakdown.fundamental_score * FUNDAMENTAL_WEIGHT
+        + breakdown.news_score * NEWS_WEIGHT
+        + breakdown.reasoning_score * REASONING_WEIGHT
+    )
+
+    return round(score)
+
+def print_critic_feedback(
+    critique: CriticResult,
+    round_number: int,
+) -> None:
+
+    print("\n" + "=" * 50)
+    print(f"CRITIC FEEDBACK - ROUND {round_number}")
+    print("=" * 50)
+
+    print(f"\nQuality Score: {critique.quality_score}/100")
+    print(f"Severity Level: {critique.severity_level}")
+    print(f"\nConclusion: {critique.conclusion}")
+
+    if critique.issues:
+        print("\nIssues:")
+
+        for i, issue in enumerate(critique.issues, start=1):
+            print(f"{i}. Issue: {issue.content}")
+            print(f"   Evidence ID: {issue.evidence_id}")
+
+            if issue.suggestion:
+                print(f"   Suggestion: {issue.suggestion}")
+
+    else:
+        print("\nIssues: None")
+
+    print("=" * 50 + "\n")
+
+def attach_citation_urls(
+    report: DraftResearchReport,
+    research_bundle: ResearchBundle,
+) -> DraftResearchReport:
+
+    evidence_map = {
+        evidence.evidence_id: evidence
+        for evidence in research_bundle.evidence
+    }
+
+    for citation in report.citations:
+        evidence = evidence_map.get(citation.evidence_id)
+
+        if evidence is not None:
+            citation.source_url = evidence.source_url
+
+    return report
+
 def route_after_critic(
     state: StockResearchState
 ) -> str:
@@ -359,6 +472,10 @@ def validate_evidence(
                         f"{evidence.source_id}"
                     ),
                     evidence_id=evidence.evidence_id,
+                    suggestion=(
+                        "Remove or correct this evidence item so that its source_id "
+                        "matches a valid collected data source."
+                    ),
                 )
             )
 
@@ -373,6 +490,10 @@ def validate_evidence(
                         f"{citation.evidence_id}"
                     ),
                     evidence_id=citation.evidence_id,
+                    suggestion=(
+                        "Replace this citation with a valid evidence_id from the research bundle "
+                        "or remove the unsupported claim."
+                    ),
                 )
             )
 

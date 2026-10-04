@@ -99,10 +99,12 @@ class ResearchBundle(BaseModel):
 class Citation(BaseModel):
     evidence_id: str #citation id is independent
     claim: str
+    source_url: str | None = None
 
 
+#TODO: Price, Technical might be calculated by hand, while news and reasoning could be calculated by agent.
 class StockScoreBreakdown(BaseModel):
-    price_score: int = Field(ge=0, le=100)
+    price_score: int = Field(ge=0, le=100) 
     technical_score: int = Field(ge=0, le=100)
     fundamental_score: int = Field(ge=0, le=100)
     news_score: int = Field(ge=0, le=100)
@@ -115,7 +117,7 @@ class DraftResearchReport(BaseModel):
     #How good the stock is. 0-100
 
     score_breakdown: StockScoreBreakdown
-    overall_score: int = Field(ge=0, le=100)
+    overall_score: int = Field(ge=0, le=100) #TODO: Manually derive formula for overall score based on the score breakdown.
 
     classification: Literal[
         "positive_watchlist_candidate",
@@ -143,6 +145,7 @@ class DraftResearchReport(BaseModel):
 class CriticItem(BaseModel):
     content: str
     evidence_id: str
+    suggestion: str 
 
 class CriticResult(BaseModel):
     conclusion: str

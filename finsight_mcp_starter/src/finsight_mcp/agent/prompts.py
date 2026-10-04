@@ -91,10 +91,14 @@ Focus on the following:
   There are major unsupported claims, serious inconsistencies, invalid
   citations, or missing evidence that could materially change the conclusion.
 
-For each issue or risk:
-- Clearly explain the problem.
-- Reference the relevant evidence when possible.
-- Do not invent source IDs, URLs, or evidence.
+For each issue:
+- Clearly explain the problem in the content field.
+- Set evidence_id to the most relevant existing evidence ID when applicable.
+- Provide a concrete and actionable suggestion describing how the report
+  should be improved.
+- If the issue cannot be fixed because required evidence is missing,
+  suggest recording the limitation in data_gaps or weakening the claim.
+- Do not invent source IDs, URLs, or evidence IDs.
 
 The conclusion should summarize whether the draft is reliable or requires
 significant revision.

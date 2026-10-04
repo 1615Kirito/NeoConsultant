@@ -146,7 +146,7 @@ async def test_evidence_assembly_node():
 
     print(bundle)
 
-    assert bundle.ticker != "AAPL"
+    assert bundle.ticker == "AAPL"
 
     assert bundle.technicals == state["technicals"]
     assert bundle.company_facts == state["company_facts"]
