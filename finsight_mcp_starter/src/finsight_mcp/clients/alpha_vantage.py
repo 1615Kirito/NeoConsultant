@@ -74,6 +74,7 @@ class AlphaVantageClient:
     async def get_price_history(
         self,
         ticker: str,
+        days: int = 100,
     ) -> PriceHistory:
 
         ticker = ticker.upper()
@@ -112,6 +113,8 @@ class AlphaVantageClient:
         prices.sort(
             key=lambda p: p.date
         )
+
+        prices = prices[-days:]
 
 
         return PriceHistory(

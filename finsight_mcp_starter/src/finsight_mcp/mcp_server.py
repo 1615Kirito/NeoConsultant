@@ -21,25 +21,20 @@ mcp = MCPServer("finsight-stock-tools")
 @mcp.tool()
 async def get_price_history(
     ticker: str,
-
+    days: int = 100,
 ) -> dict:
-    """
-    Get historical stock price data for a ticker.
-
-    Args:
-        ticker: Stock ticker symbol, e.g. AAPL.
-        days: Number of recent trading days to return.
-    """
     client = AlphaVantageClient(settings)
 
     result = await client.get_price_history(
         ticker=ticker,
+        days=days,
     )
 
     if hasattr(result, "model_dump"):
         return result.model_dump(mode="json")
 
     return result
+
 
 @mcp.tool()
 async def get_recent_news(ticker: str) -> dict:
@@ -78,12 +73,6 @@ async def get_company_facts(
         return result.model_dump(mode="json")
 
     return result
-
-
-
-
-
-
 
 
 if __name__ == "__main__":

@@ -79,6 +79,7 @@ class Evidence(BaseModel):
     source_url: str
     category: str
     description: str
+    sentiment_score: float | None = None
 
 # -------------------------
 # Research bundle

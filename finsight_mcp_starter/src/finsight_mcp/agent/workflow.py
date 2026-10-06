@@ -138,7 +138,7 @@ def quantitative_analysis_node(
         "technicals": technicals,
     }
 
-#Evidnec
+#Evidence
 def evidence_assembly_node(
     state: StockResearchState
 ) -> dict:

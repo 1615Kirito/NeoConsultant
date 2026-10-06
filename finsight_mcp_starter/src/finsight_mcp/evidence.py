@@ -167,6 +167,7 @@ def build_evidence(
                 description=(
                     f"{article.title}. {article.summary}"
                 ),
+                sentiment_score=article.sentiment_score,
             )
         )
 
